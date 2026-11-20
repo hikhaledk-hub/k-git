@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>مقدمة إلى Git وGitHub — عرض تفاعلي</title>
+<meta name="description" content="عرض تقديمي تفاعلي يشرح نظام Git ومنصة GitHub للمبتدئين" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Tajawal:wght@300;400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   1) المتغيرات العامة والثيم الداكن المستوحى من GitHub
+   ============================================================ */
+:root{
+  --bg-0:#0d1117;              /* خلفية GitHub الداكنة */
+  --bg-1:#010409;
+  --surface:#161b22;
+  --surface-2:#1c2128;
+  --line:#30363d;
+  --text:#e6edf3;
+  --muted:#9198a1;
+  --green:#2ea043;             /* أخضر GitHub */
+  --green-hi:#3fb950;
+  --blue:#1f6feb;              /* أزرق GitHub */
+  --blue-hi:#58a6ff;
+  --purple:#8957e5;
+  --orange:#d29922;
+  --pink:#db61a2;
+  --radius:18px;
+  --slide-pad:clamp(1.25rem, 4vw, 4.5rem);
+  --shadow:0 20px 60px rgba(0,0,0,.45);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+html,body{height:100%}
+
+body{
+  font-family:"Cairo","Tajawal",system-ui,sans-serif;
+  background:var(--bg-1);
+  color:var(--text);
+  direction:rtl;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* خلفية نجمية/تدرجات ثابتة خلف الشرائح */
+body::before{
+  content:"";
+  position:fixed; inset:0;
+  background:
+    radial-gradient(900px 520px at 85% -10%, rgba(31,111,235,.30), transparent 60%),
+    radial-gradient(760px 460px at 8% 0%, rgba(137,87,229,.26), transparent 62%),
+    radial-gradient(1000px 600px at 50% 115%, rgba(46,160,67,.20), transparent 65%),
+    linear-gradient(160deg, var(--bg-1), var(--bg-0) 55%, #0a0f16);
+  z-index:-2;
+}
+body::after{
+  content:"";
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(circle at 50% 45%, #000 30%, transparent 78%);
+  z-index:-1;
+}
+
+/* ============================================================
+   2) شريط التقدم + العداد
+   ============================================================ */
+.progress{
+  position:fixed; top:0; right:0; left:0; height:4px;
+  background:rgba(255,255,255,.06); z-index:60;
+}
+.progress span{
+  display:block; height:100%; width:0%;
+  background:linear-gradient(90deg, var(--green-hi), var(--blue-hi), var(--purple));
+  box-shadow:0 0 14px rgba(88,166,255,.7);
+  transition:width .55s cubic-bezier(.22,1,.36,1);
+}
+
+.counter{
+  position:fixed; top:18px; left:20px; z-index:60;
+  font-family:"JetBrains Mono",monospace;
+  font-size:.82rem; letter-spacing:1px;
+  color:var(--muted);
+  background:rgba(22,27,34,.7);
+  border:1px solid var(--line);
+  padding:.35rem .75rem; border-radius:999px;
+  backdrop-filter:blur(8px);
+}
+.counter b{color:var(--blue-hi);font-weight:600}
+
+/* ============================================================
+   3) حاوية الشرائح والانتقالات
+   ============================================================ */
+.deck{position:fixed; inset:0}
+
+.slide{
+  position:absolute; inset:0;
+  display:grid; place-items:center;
+  padding:var(--slide-pad);
+  padding-block:clamp(3.5rem,7vh,5rem);
+  overflow-y:auto; overflow-x:hidden;
+  opacity:0;
+  visibility:hidden;
+  transform:translateX(-6%) scale(.97);
+  filter:blur(6px);
+  transition:opacity .55s ease, transform .6s cubic-bezier(.22,1,.36,1), filter .55s ease, visibility 0s linear .6s;
+}
+.slide.active{
+  opacity:1; visibility:visible; transform:none; filter:none;
+  transition:opacity .55s ease, transform .6s cubic-bezier(.22,1,.36,1), filter .55s ease, visibility 0s;
+}
+.slide.leaving-back{transform:translateX(6%) scale(.97)}
+.slide::-webkit-scrollbar{width:8px}
+.slide::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+
+.inner{width:min(1180px,100%);display:grid;gap:clamp(1rem,2.4vh,1.9rem)}
+
+/* ظهور تدريجي لمكونات الشريحة */
+.slide .stagger > *{opacity:0; transform:translateY(22px); animation:rise .7s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+.stagger > *:nth-child(1){animation-delay:.10s}
+.stagger > *:nth-child(2){animation-delay:.18s}
+.stagger > *:nth-child(3){animation-delay:.26s}
+.stagger > *:nth-child(4){animation-delay:.34s}
+.stagger > *:nth-child(5){animation-delay:.42s}
+.stagger > *:nth-child(6){animation-delay:.50s}
+.stagger > *:nth-child(7){animation-delay:.58s}
+.stagger > *:nth-child(8){animation-delay:.66s}
+.stagger > *:nth-child(9){animation-delay:.74s}
+
+/* ============================================================
+   4) الطبقات النصية
+   ============================================================ */
+.eyebrow{
+  display:inline-flex; align-items:center; gap:.55rem;
+  font-size:.8rem; font-weight:700; letter-spacing:.6px;
+  color:var(--blue-hi);
+  background:rgba(31,111,235,.14);
+  border:1px solid rgba(88,166,255,.35);
+  padding:.35rem .9rem; border-radius:999px;
+  width:max-content;
+}
+.eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green-hi);box-shadow:0 0 10px var(--green-hi)}
+
+h1.title{
+  font-size:clamp(2.6rem,7vw,5.2rem);
+  font-weight:900; line-height:1.1;
+  background:linear-gradient(120deg,#fff 15%,var(--blue-hi) 55%,var(--green-hi) 95%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  letter-spacing:-1px;
+}
+h2.head{
+  font-size:clamp(1.9rem,4.4vw,3.2rem);
+  font-weight:800; line-height:1.25;
+  display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;
+}
+h2.head .num{
+  font-family:"JetBrains Mono",monospace;
+  font-size:.85em; color:var(--purple);
+  background:rgba(137,87,229,.14);
+  border:1px solid rgba(137,87,229,.4);
+  border-radius:12px; padding:.1em .45em;
+}
+.sub{font-size:clamp(1rem,1.9vw,1.35rem);color:var(--muted);font-weight:400;line-height:1.9}
+.lead{font-size:clamp(1rem,1.7vw,1.22rem);line-height:2.1;color:#c9d1d9}
+.hr{height:4px;width:96px;border-radius:99px;background:linear-gradient(90deg,var(--green-hi),var(--blue-hi),transparent)}
+
+.en{
+  direction:ltr; unicode-bidi:isolate;
+  font-family:"JetBrains Mono",monospace;
+  color:var(--blue-hi); background:rgba(88,166,255,.10);
+  border:1px solid rgba(88,166,255,.28);
+  padding:.06em .45em; border-radius:7px;
+  font-size:.9em; font-weight:600; white-space:nowrap;
+}
+.tag{color:var(--green-hi);font-weight:700}
+
+/* ============================================================
+   5) بطاقات وقوائم
+   ============================================================ */
+.grid{display:grid; gap:clamp(.7rem,1.6vh,1.1rem)}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+
+.card{
+  background:linear-gradient(160deg, rgba(28,33,40,.92), rgba(16,21,27,.92));
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:clamp(1rem,2vh,1.45rem) clamp(1rem,2vw,1.6rem);
+  display:flex; gap:1rem; align-items:flex-start;
+  box-shadow:0 8px 26px rgba(0,0,0,.30);
+  transition:transform .35s ease, border-color .35s ease, box-shadow .35s ease;
+  position:relative; overflow:hidden;
+}
+.card::after{
+  content:""; position:absolute; inset:auto 0 0 0; height:3px;
+  background:linear-gradient(90deg,var(--green-hi),var(--blue-hi));
+  transform:scaleX(0); transform-origin:right; transition:transform .45s ease;
+}
+.card:hover{transform:translateY(-6px); border-color:rgba(88,166,255,.45); box-shadow:0 18px 40px rgba(0,0,0,.5)}
+.card:hover::after{transform:scaleX(1)}
+
+.ico{
+  flex:0 0 auto; width:46px; height:46px; border-radius:13px;
+  display:grid; place-items:center; font-size:1.35rem;
+  background:rgba(31,111,235,.15); border:1px solid rgba(88,166,255,.32);
+}
+.ico.green{background:rgba(46,160,67,.15);border-color:rgba(63,185,80,.34)}
+.ico.purple{background:rgba(137,87,229,.15);border-color:rgba(167,139,250,.34)}
+.ico.orange{background:rgba(210,153,34,.15);border-color:rgba(241,198,81,.34)}
+.ico.pink{background:rgba(219,97,162,.15);border-color:rgba(244,143,197,.34)}
+
+.card h3{font-size:clamp(1.02rem,1.7vw,1.22rem);font-weight:700;margin-bottom:.3rem}
+.card p{color:var(--muted);font-size:.95rem;line-height:1.85}
+
+ul.list{list-style:none;display:grid;gap:.75rem}
+ul.list li{
+  display:flex; gap:.75rem; align-items:flex-start;
+  background:rgba(22,27,34,.66);
+  border:1px solid var(--line);
+  border-right:3px solid var(--green-hi);
+  border-radius:12px;
+  padding:.72rem 1rem;
+  font-size:clamp(.95rem,1.5vw,1.08rem);
+  line-height:1.8;
+  transition:background .3s, transform .3s;
+}
+ul.list li:hover{background:rgba(31,37,45,.9); transform:translateX(-6px)}
+ul.list li .bullet{
+  flex:0 0 auto; width:24px;height:24px;border-radius:7px;
+  display:grid;place-items:center;
+  background:rgba(46,160,67,.18); color:var(--green-hi);
+  font-size:.85rem; font-weight:800; margin-top:.2rem;
+}
+ul.list li b{color:#fff}
+ul.list li small{display:block;color:var(--muted);font-size:.86rem;margin-top:.1rem}
+
+/* ============================================================
+   6) الغلاف
+   ============================================================ */
+.cover{justify-items:center;text-align:center;gap:1.6rem}
+.cover .logos{display:flex;align-items:center;gap:clamp(1rem,4vw,2.6rem);flex-wrap:wrap;justify-content:center}
+.logo-badge{
+  display:flex;align-items:center;gap:.8rem;
+  background:rgba(22,27,34,.75);
+  border:1px solid var(--line);
+  padding:.7rem 1.3rem; border-radius:16px;
+  box-shadow:var(--shadow);
+  animation:float 5s ease-in-out infinite;
+}
+.logo-badge:nth-child(3){animation-delay:-2.5s}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.logo-badge span{font-weight:800;font-size:1.15rem;direction:ltr}
+.logo-badge svg{width:38px;height:38px}
+.cover .meta{
+  display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;
+  color:var(--muted);font-size:.95rem;
+}
+.cover .meta div{
+  background:rgba(22,27,34,.7); border:1px solid var(--line);
+  padding:.55rem 1.1rem; border-radius:999px;
+}
+.kbd-hint{
+  display:flex;gap:.6rem;align-items:center;justify-content:center;
+  color:var(--muted);font-size:.85rem;margin-top:.4rem;
+}
+kbd{
+  font-family:"JetBrains Mono",monospace;
+  background:#0b0f14;border:1px solid var(--line);
+  border-bottom-width:3px; border-radius:8px;
+  padding:.15rem .5rem; color:var(--blue-hi); font-size:.8rem;
+}
+
+/* ============================================================
+   7) جدول المقارنة + الرسم التوضيحي
+   ============================================================ */
+.compare{
+  display:grid; grid-template-columns:1fr auto 1fr; gap:clamp(.6rem,1.6vw,1.4rem);
+  align-items:stretch;
+}
+.col{
+  background:linear-gradient(170deg, rgba(28,33,40,.95), rgba(14,19,25,.95));
+  border:1px solid var(--line); border-radius:var(--radius);
+  padding:clamp(1rem,2.4vh,1.7rem); box-shadow:var(--shadow);
+}
+.col h3{
+  font-size:clamp(1.15rem,2.2vw,1.6rem); font-weight:800;
+  display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem;
+  padding-bottom:.7rem; border-bottom:1px dashed var(--line);
+}
+.col.git h3{color:#f85149}
+.col.gh h3{color:var(--blue-hi)}
+.col ul{list-style:none;display:grid;gap:.6rem}
+.col li{
+  display:flex;gap:.6rem;align-items:flex-start;
+  font-size:clamp(.92rem,1.5vw,1.05rem); line-height:1.8; color:#c9d1d9;
+}
+.col li::before{content:"▸";color:var(--purple);font-weight:800}
+.vs{
+  align-self:center;
+  width:clamp(52px,7vw,74px); height:clamp(52px,7vw,74px);
+  border-radius:50%; display:grid; place-items:center;
+  font-weight:900; font-size:clamp(.9rem,1.6vw,1.15rem);
+  background:linear-gradient(140deg,var(--purple),var(--blue));
+  box-shadow:0 0 0 6px rgba(137,87,229,.14), 0 10px 30px rgba(0,0,0,.5);
+  animation:pulse 2.6s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+
+.relation{
+  margin-top:.4rem;
+  display:flex;align-items:center;justify-content:center;gap:clamp(.5rem,2vw,1.4rem);
+  flex-wrap:wrap;
+  background:rgba(22,27,34,.6); border:1px dashed var(--line);
+  border-radius:var(--radius); padding:clamp(.8rem,2vh,1.3rem);
+}
+.node{
+  display:flex;flex-direction:column;align-items:center;gap:.4rem;
+  background:var(--surface-2); border:1px solid var(--line);
+  border-radius:14px; padding:.7rem 1.1rem; font-weight:700; font-size:.95rem;
+}
+.node small{color:var(--muted);font-weight:400;font-size:.78rem}
+.node .dot{width:34px;height:34px;display:grid;place-items:center;border-radius:10px}
+.arrow-lane{display:grid;gap:.35rem;min-width:clamp(90px,16vw,190px)}
+.arrow-lane div{
+  direction:ltr; text-align:center;
+  font-family:"JetBrains Mono",monospace; font-size:.78rem;
+  background:rgba(31,111,235,.12); border:1px solid rgba(88,166,255,.28);
+  border-radius:999px; padding:.3rem .6rem; color:var(--blue-hi);
+}
+.arrow-lane div:nth-child(2){background:rgba(46,160,67,.12);border-color:rgba(63,185,80,.3);color:var(--green-hi)}
+
+/* ============================================================
+   8) المصطلحات
+   ============================================================ */
+.terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:clamp(.7rem,1.5vh,1rem)}
+.term{
+  background:linear-gradient(160deg, rgba(28,33,40,.95), rgba(14,19,25,.95));
+  border:1px solid var(--line); border-radius:16px;
+  padding:1rem 1.15rem; position:relative; overflow:hidden;
+  transition:transform .35s, border-color .35s;
+}
+.term:hover{transform:translateY(-6px);border-color:rgba(63,185,80,.5)}
+.term::before{
+  content:""; position:absolute; top:0; right:0;
+  width:4px; height:100%;
+  background:linear-gradient(180deg,var(--green-hi),var(--blue-hi));
+}
+.term .t-en{
+  direction:ltr; unicode-bidi:isolate;
+  font-family:"JetBrains Mono",monospace; font-weight:600;
+  font-size:1.12rem; color:var(--green-hi); display:block; margin-bottom:.15rem;
+}
+.term .t-ar{font-weight:700;font-size:1rem;margin-bottom:.35rem}
+.term p{color:var(--muted);font-size:.9rem;line-height:1.8}
+
+/* ============================================================
+   9) دورة العمل (خطوات)
+   ============================================================ */
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:clamp(.7rem,1.6vw,1.2rem);position:relative}
+.step{
+  background:linear-gradient(170deg, rgba(28,33,40,.96), rgba(13,18,24,.96));
+  border:1px solid var(--line); border-radius:16px;
+  padding:1.1rem 1rem; text-align:center; display:grid; gap:.5rem; justify-items:center;
+  transition:transform .35s, border-color .35s, box-shadow .35s;
+}
+.step:hover{transform:translateY(-7px);border-color:rgba(88,166,255,.5);box-shadow:0 16px 36px rgba(0,0,0,.5)}
+.step .idx{
+  width:38px;height:38px;border-radius:50%;
+  display:grid;place-items:center;font-weight:900;font-family:"JetBrains Mono",monospace;
+  background:linear-gradient(140deg,var(--blue),var(--purple)); color:#fff;
+  box-shadow:0 6px 18px rgba(31,111,235,.45);
+}
+.step h4{font-size:1.02rem;font-weight:700;line-height:1.6}
+.step code{
+  direction:ltr; font-family:"JetBrains Mono",monospace; font-size:.85rem;
+  color:var(--green-hi); background:rgba(46,160,67,.12);
+  border:1px solid rgba(63,185,80,.3); border-radius:8px; padding:.2rem .5rem;
+}
+
+/* ============================================================
+   10) مربعات الأوامر (ستايل محرر أكواد)
+   ============================================================ */
+.cmd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:clamp(.7rem,1.6vh,1.1rem)}
+.cmd{
+  background:#0b0f14; border:1px solid var(--line);
+  border-radius:14px; overflow:hidden;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);
+  transition:transform .3s, border-color .3s;
+}
+.cmd:hover{transform:translateY(-5px);border-color:rgba(63,185,80,.5)}
+.cmd .bar{
+  display:flex;align-items:center;gap:.45rem;
+  background:#131920; padding:.5rem .8rem; border-bottom:1px solid var(--line);
+}
+.cmd .bar i{width:11px;height:11px;border-radius:50%;display:block}
+.cmd .bar i:nth-child(1){background:#ff5f56}
+.cmd .bar i:nth-child(2){background:#ffbd2e}
+.cmd .bar i:nth-child(3){background:#27c93f}
+.cmd .bar span{
+  margin-inline-start:auto; direction:ltr;
+  font-family:"JetBrains Mono",monospace;font-size:.72rem;color:var(--muted);
+}
+.cmd pre{
+  direction:ltr; text-align:left;
+  font-family:"JetBrains Mono",monospace;
+  padding:.9rem 1rem .35rem; font-size:.98rem; line-height:1.7;
+  color:#7ee787; overflow-x:auto;
+}
+.cmd pre .prompt{color:var(--blue-hi);user-select:none}
+.cmd .desc{
+  direction:rtl; text-align:right;
+  padding:.55rem 1rem .9rem; color:var(--muted); font-size:.92rem;
+  border-top:1px dashed rgba(48,54,61,.7); margin-top:.4rem;
+}
+
+/* ============================================================
+   11) الخلاصة / الشكر
+   ============================================================ */
+.thanks{text-align:center;justify-items:center;gap:1.4rem}
+.thanks .big{
+  font-size:clamp(2.6rem,8vw,5.5rem);font-weight:900;
+  background:linear-gradient(120deg,var(--green-hi),var(--blue-hi),var(--purple));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.9rem;width:min(960px,100%)}
+.summary div{
+  background:rgba(22,27,34,.8);border:1px solid var(--line);
+  border-radius:14px;padding:1rem;text-align:center;
+}
+.summary b{display:block;color:var(--blue-hi);font-family:"JetBrains Mono",monospace;font-size:1.5rem}
+.summary small{color:var(--muted);font-size:.88rem}
+
+/* ============================================================
+   12) أزرار التنقل + النقاط
+   ============================================================ */
+.nav{
+  position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+  display:flex; align-items:center; gap:.65rem; z-index:60;
+  background:rgba(13,18,24,.82);
+  border:1px solid var(--line);
+  padding:.45rem .7rem; border-radius:999px;
+  backdrop-filter:blur(10px);
+  box-shadow:0 10px 30px rgba(0,0,0,.5);
+}
+.nav button{
+  width:38px;height:38px;border-radius:50%;
+  background:var(--surface-2); border:1px solid var(--line);
+  color:var(--text); cursor:pointer; font-size:1rem;
+  display:grid;place-items:center;
+  transition:background .25s, transform .25s, border-color .25s;
+}
+.nav button:hover:not(:disabled){background:var(--blue);border-color:var(--blue-hi);transform:scale(1.1)}
+.nav button:disabled{opacity:.32;cursor:not-allowed}
+.dots{display:flex;gap:.4rem;padding:0 .3rem}
+.dots i{
+  width:8px;height:8px;border-radius:50%;
+  background:#3d444d;cursor:pointer;transition:all .3s;
+}
+.dots i.on{background:linear-gradient(90deg,var(--green-hi),var(--blue-hi));width:26px;border-radius:99px}
+
+/* ============================================================
+   13) تحسينات الاستجابة
+   ============================================================ */
+@media (max-width:760px){
+  .compare{grid-template-columns:1fr}
+  .vs{margin:0 auto}
+  .nav{bottom:10px;gap:.4rem;padding:.4rem .55rem}
+  .nav button{width:34px;height:34px}
+  .counter{top:12px;left:12px;font-size:.75rem}
+  .relation{flex-direction:column}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;transition-duration:.001ms !important}
+}
+</style>
+</head>
+
+<body>
+
+<!-- شريط التقدم -->
+<div class="progress"><span id="bar"></span></div>
+<div class="counter"><b id="cur">01</b> / <span id="tot">10</span></div>
+
+<main class="deck" id="deck">
+
+  <!-- ========== الشريحة 1: الغلاف ========== -->
+  <section class="slide active" aria-label="الشريحة 1">
+    <div class="inner cover stagger">
+      <span class="eyebrow">عرض تعليمي تفاعلي • Interactive Presentation</span>
+
+      <div class="logos">
+        <div class="logo-badge">
+          <!-- شعار Git -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gGit" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0" stop-color="#f05133"/><stop offset="1" stop-color="#d29922"/>
+            </linearGradient></defs>
+            <path fill="url(#gGit)" d="M23.5 11.1 12.9.54a1.83 1.83 0 0 0-2.59 0L8.17 2.68l2.77 2.77a1.67 1.67 0 0 1 1.69 1.69 1.66 1.66 0 0 1-.49 1.19 1.66 1.66 0 0 1-1.19.49 1.67 1.67 0 0 1-1.19-.49l-2.74-2.74v7.18a1.67 1.67 0 0 1 .49 1.19 1.67 1.67 0 1 1-1.68-1.68V6.06a1.66 1.66 0 0 1-.9-1.1L4.06 2.21.55 5.72a1.83 1.83 0 0 0 0 2.59L11.1 18.85a1.83 1.83 0 0 0 2.59 0l4.51-4.5a1.67 1.67 0 0 1-.42-1.1 1.67 1.67 0 1 1 1.67 1.67c0 .43-.15.83-.42 1.15l-4.51 4.5a1.83 1.83 0 0 1-2.59 0L.55 12.64a1.83 1.83 0 0 1 0-2.59"/>
+          </svg>
+          <span>Git</span>
+        </div>
+
+        <div class="logo-badge">
+          <!-- شعار GitHub -->
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="#e6edf3">
+            <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23a11.5 11.5 0 0 1 3-.405c1.02.005 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+          </svg>
+          <span>GitHub</span>
+        </div>
+      </div>
+
+      <h1 class="title">مقدمة إلى Git وGitHub</h1>
+      <p class="sub">تعرف على أدوات إدارة الأكواد البرمجية والعمل الجماعي.</p>
+      <div class="hr"></div>
+
+      <div class="meta">
+        <div>إعداد وتقديم: <b style="color:#fff">[اسم الطالب]</b></div>
+        <div>المستوى: مبتدئين <span class="tag">Beginner</span></div>
+        <div>المدة: <b style="color:#fff">10 شرائح</b></div>
+      </div>
+
+      <div class="kbd-hint">
+        <span>استخدم</span><kbd>←</kbd><kbd>→</kbd>
+        <span>للتنقل بين الشرائح</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== الشريحة 2: ما هو Git؟ ========== -->
+  <section class="slide" aria-label="الشريحة 2">
+    <div class="inner stagger">
+      <span class="eyebrow">المفهوم الأساسي</span>
+      <h2 class="head"><span class="num">02</span> ما هو Git؟ <span class="en">What is Git?</span></h2>
+      <div class="hr"></div>
+
+      <ul class="list">
+        <li><span class="bullet">✓</span><span>نظام للتحكم في الإصدارات <span class="en">Version Control System</span> يُسجّل كل تغيير يتم على ملفات المشروع.</span></li>
+        <li><span class="bullet">✓</span><span>يساعد المبرمجين على <b>تتبّع التغييرات</b> في ملفات المشروع وتوثيقها.</span></li>
+        <li><span class="bullet">✓</span><span>يسمح بال<b>الرجوع إلى الإصدارات السابقة</b> بضغطة واحدة <span class="en">History / Rollback</span>.</span></li>
+        <li><span class="bullet">✓</span><span>يساعد على <b>تنظيم العمل البرمجي</b> وتفادي الازدواج والتضارب.</span></li>
+      </ul>
+
+      <div class="card">
+        <div class="ico green">💡</div>
+        <div>
+          <h3>مثال توضيحي</h3>
+          <p>الاحتفاظ بنسخ متعددة من المشروع دون الحاجة إلى إنشاء ملفات جديدة يدويًا — بدلًا من
+          <span class="en">project-v1</span> و <span class="en">project-v2-final-new</span>،
+          يحتفظ Git بكامل التاريخ داخل مجلد واحد خفي <span class="en">.git</span>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== الشريحة 3: لماذا نستخدم Git؟ ========== -->
+  <section class="slide" aria-label="الشريحة 3">
+    <div class="inner stagger">
+      <span class="eyebrow">المزايا</span>
+      <h2 class="head"><span class="num">03</span> لماذا نستخدم Git؟ <span class="en">Why Git?</span></h2>
+      <div class="hr"></div>
+
+      <div class="grid g3">
+        <div class="card"><div class="ico green">🕘</div><div><h3>حفظ تاريخ التعديلات</h3><p>كل تغيير مسجّل مع التوقيت ووصف واضح، فيصبح المشروع ذاكرة كاملة.</p></div></div>
+        <div class="card"><div class="ico">⏪</div><div><h3>استرجاع الإصدارات السابقة</h3><p>يمكنك الرجوع لأي لحظة في الماضي إذا حدث خطأ أو تلف الملف.</p></div></div>
+        <div class="card"><div class="ico purple">👤</div><div><h3>معرفة من عدّل الملفات</h3><p>أرخصم التعديل ووقته عبر الأمر <span class="en">git log</span>.</p></div></div>
+        <div class="card"><div class="ico orange">🛡️</div><div><h3>تقليل فقدان العمل</h3><p>الالتزام المنتظم <span class="en">Commit</span> يحمي جهودك من المفاجآت.</p></div></div>
+        <div class="card"><div class="ico pink">🤝</div><div><h3>تسهيل العمل على المشاريع الكبيرة</h3><p>فروع مستقلة تتيح للجميع العمل دون تعطيل بعضهم.</p></div></div>
+        <div class="card"><div class="ico">🌐</div><div><h3>دعم سير العمل الحديث</h3><p>تكامل مباشر مع <span class="en">GitHub</span> وأنظمة النشر <span class="en">CI/CD</span>.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== الشريحة 4: ما هو GitHub؟ ========== -->
+  <section class="slide" aria-label="الشريحة 4">
+    <div class="inner stagger">
+      <span class="eyebrow">المنصة</span>
+      <h2 class="head"><span class="num">04</span> ما هو GitHub؟ <span class="en">What is GitHub?</span></h2>
+      <div class="hr"></div>
+
+      <div class="grid g2">
+        <div>
+          <ul class="list">
+            <li><span class="bullet">✓</span><span>منصة إلكترونية <b>لاستضافة المشاريع البرمجية</b> <span class="en">Hosting Platform</span>.</span></li>
+            <li><span class="bullet">✓</span><span>تعتمد على نظام <b>Git</b> كمحرّك أساسي لإدارة الإصدارات.</span></li>
+            <li><span class="bullet">✓</span><span>تسمح بـ<b>حفظ المشاريع عبر الإنترنت</b> والوصول إليها من أي جهاز.</span></li>
+            <li><span class="bullet">✓</span><span>تساعد المبرمجين على <b>مشاركة الأكواد والتعاون</b> في مساحة واحدة.</span></li>
+          </ul>
+        </div>
+
+        <div class="card" style="flex-direction:column;align-items:center;text-align:center;justify-content:center;min-height:230px">
+          <svg viewBox="0 0 24 24" style="width:clamp(84px,12vw,132px);height:auto;filter:drop-shadow(0 12px 30px rgba(0,0,0,.6))" fill="#e6edf3" aria-label="GitHub logo">
+            <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23a11.5 11.5 0 0 1 3-.405c1.02.005 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+          </svg>
+          <h3 style="margin-top:.9rem">github.com</h3>
+          <p>أكثر من 420 مليون مستودع <span class="en">Repository</span> — مجتمع عالمي للمطورين.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== الشريحة 5: الفرق بين Git وGitHub ========== -->
+  <section class="slide" aria-label="الشريحة 5">
+    <div class="inner stagger">
+      <span class="eyebrow">مقارنة</span>
+      <h2 class="head"><span class="num">05</span> الفرق بين Git وGitHub</h2>
+      <div class="hr"></div>
+
+      <div class="compare">
+        <div class="col git">
+          <h3>🔴 Git</h3>
+          <ul>
+            <li>نظام للتحكم في الإصدارات <span class="en">Version Control</span>.</li>
+            <li>يعمل على جهاز الكمبيوتر <b>محليًا</b> <span class="en">Local</span>.</li>
+            <li>يتتبّع التغييرات في الملفات داخليًا.</li>
+            <li>برنامج يحتاج تثبيتًا، ولا يحتاج اتصال إنترنت.</li>
+          </ul>
+        </div>
+
+        <div class="vs">VS</div>
+
+        <div class="col gh">
+          <h3>🔵 GitHub</h3>
+          <ul>
+            <li>منصة لاستضافة المشاريع <span class="en">Hosting</span>.</li>
+            <li>تعمل عبر الإنترنت <span class="en">Cloud</span>.</li>
+            <li>تسهّل مشاركة المشاريع والتعاون الجماعي.</li>
+            <li>موقع ويب يحتاج اتصالًا، ويستضيف مستودعات Git.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="relation">
+        <div class="node"><span class="dot" style="background:rgba(240,81,51,.15)">💻</span> جهازك <small>Local — Git</small></div>
+        <div class="arrow-lane">
+          <div>git push →</div>
+          <div>← git pull</div>
+        </div>
+        <div class="node"><span class="dot" style="background:rgba(31,111,235,.15)">☁️</span> GitHub <small>Remote — Cloud</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== الشريحة 6: أهم مصطلحات Git ========== -->
+  <section class="slide" aria-label="الشريحة 6">
+    <div class="inner stagger">
+      <span class="eyebrow">المفردات</span>
+      <h2 class="head"><span class="num">06</span> أهم مصطلحات Git <span class="en">Key Terms</span></h2>
+      <div class="hr"></div>
+
+      <div class="terms">
+        <div class="term"><span class="t-en">Repository</span><div class="t-ar">المستودع</div><p>مكان حفظ ملفات المشروع وسجل تغييراته كاملًا.</p></div>
+        <div class="term"><span class="t-en">Commit</span><div class="t-ar">حفظ التغييرات</div><p>تسجيل نسخة من التعديلات في سجل المشروع.</p></div>
+        <div class="term"><span class="t-en">Branch</span><div class="t-ar">الفرع</div><p>مسار مستقل للعمل على المشروع دون التأثير على الآخرين.</p></div>
+        <div class="term"><span class="t-en">Merge</span><div class="t-ar">الدمج</div><p>دمج التعديلات من فرع إلى آخر.</p></div>
+        <div class="term"><span class="t-en">Clone</span><div class="t-ar">الاستنساخ</div><p>نسخ مستودع كامل إلى جهازك.</p></div>
+        <div class="term"><span class="t-en">Push</span><div class="t-ar">الرفع</div><p>إرسال التعديلات المحلية إلى GitHub.</p></div>
+        <div class="term"><span class="t-en">Pull</span><div class="t-ar">السحب</div><p>جلب التحديثات من المستودع البعيد إلى جهازك.</p></div>
+        <div class="term"><span class="t-en">Remote</span><div class="t-ar">النقطة البعيدة</div><p>نسخة المشروع المخزّنة على الخادم/الإنترنت.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== الشريحة 7: كيف يعمل Git؟ ========== -->
+  <section class="slide" aria-label="الشريحة 7">
+    <div class="inner stagger">
+      <span class="eyebrow">دورة العمل</span>
+      <h2 class="head"><span class="num">07</span> كيف يعمل Git؟ <span class="en">The Workflow</span></h2>
+      <div class="hr"></div>
+
+      <div class="flow">
+        <div class="step"><span class="idx">1</span><h4>إنشاء المشروع</h4><code>my-project/</code></div>
+        <div class="step"><span class="idx">2</span><h4>تهيئة Git</h4><code>git init</code></div>
+        <div class="step"><span class="idx">3</span><h4>إضافة الملفات</h4><code>git add .</code></div>
+        <div class="step"><span class="idx">4</span><h4>تسجيل التعديلات</h4><code>git commit -m "msg"</code></div>
+        <div class="step"><span class="idx">5</span><h4>الرفع إلى GitHub</h4><code>git push</code></div>
+      </div>
+
+      <div class="relation">
+        <div class="node"><span class="dot" style="background:rgba(137,87,229,.15)">📁</span> Working Directory <small>ملفات العمل</small></div>
+        <div class="arrow-lane"><div>git add →</div><div>Staging Area</div></div>
+        <div class="node"><span class="dot" style="background:rgba(46,160,67,.15)">💾</span> Local Repository <small>المستودع المحلي</small></div>
+        <div class="arrow-lane"><div>git push →</div><div>GitHub</div></div>
+        <div class="node"><span class="dot" style="background:rgba(31,111,235,.15)">☁️</span> Remote <small>المستودع البعيد</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== الشريحة 8: أهم أوامر Git ========== -->
+  <section class="slide" aria-label="الشريحة 8">
+    <div class="inner stagger">
+      <span class="eyebrow">التطبيق العملي</span>
+      <h2 class="head"><span class="num">08</span> أهم أوامر Git <span class="en">Basic Commands</span></h2>
+      <div class="hr"></div>
+
+      <div class="cmd-grid">
+        <div class="cmd"><div class="bar"><i></i><i></i><i></i><span>bash</span></div>
+          <pre><span class="prompt">$ </span>git init</pre>
+          <div class="desc">تهيئة مستودع جديد في المجلد الحالي.</div></div>
+
+        <div class="cmd"><div class="bar"><i></i><i></i><i></i><span>bash</span></div>
+          <pre><span class="prompt">$ </span>git status</pre>
+          <div class="desc">معرفة حالة الملفات (معدّل / مضاف / جديد).</div></div>
+
+        <div class="cmd"><div class="bar"><i></i><i></i><i></i><span>bash</span></div>
+          <pre><span class="prompt">$ </span>git add .</pre>
+          <div class="desc">إضافة جميع الملفات إلى منطقة التجهيز.</div></div>
+
+        <div class="cmd"><div class="bar"><i></i><i></i><i></i><span>bash</span></div>
+          <pre><span class="prompt">$ </span>git commit -m "Initial commit"</pre>
+          <div class="desc">تسجيل التغييرات برسالة وصفية.</div></div>
+
+        <div class="cmd"><div class="bar"><i></i><i></i><i></i><span>bash</span></div>
+          <pre><span class="prompt">$ </span>git push</pre>
+          <div class="desc">رفع التغييرات المحلية إلى GitHub.</div></div>
+
+        <div class="cmd"><div class="bar"><i></i><i></i><i></i><span>bash</span></div>
+          <pre><span class="prompt">$ </span>git pull</pre>
+          <div class="desc">جلب آخر التحديثات من المستودع البعيد.</div></div>
+
+        <div class="cmd"><div class="bar"><i></i><i></i><i></i><span>bash</span></div>
+          <pre><span class="prompt">$ </span>git clone &lt;url&gt;</pre>
+          <div class="desc">نسخ مستودع موجود من الإنترنت إلى جهازك.</div></div>
+
+        <div class="cmd"><div class="bar"><i></i><i></i><i></i><span>bash</span></div>
+          <pre><span class="prompt">$ </span>git log --oneline</pre>
+          <div class="desc">عرض سجل التعديلات بشكل مختصر.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== الشريحة 9: فوائد GitHub والعمل الجماعي ========== -->
+  <section class="slide" aria-label="الشريحة 9">
+    <div class="inner stagger">
+      <span class="eyebrow">العمل الجماعي</span>
+      <h2 class="head"><span class="num">09</span> فوائد GitHub والعمل الجماعي <span class="en">Collaboration</span></h2>
+      <div class="hr"></div>
+
+      <ul class="list">
+        <li><span class="bullet">✓</span><span><b>التعاون بين المبرمجين</b> على مستودع واحد من أي مكان في العالم.</span></li>
+        <li><span class="bullet">✓</span><span><b>مشاركة المشاريع البرمجية</b> علنًا أو ضمن فريق مغلق.</span></li>
+        <li><span class="bullet">✓</span><span><b>متابعة التعديلات</b> عبر سجل الإصدارات ونظام القضايا <span class="en">Issues</span>.</span></li>
+        <li><span class="bullet">✓</span><span><b>المساهمة في المشاريع مفتوحة المصدر</b> <span class="en">Open Source</span>.</span></li>
+        <li><span class="bullet">✓</span><span>استخدام <span class="en">Pull Requests</span> لمراجعة ودمج التعديلات بأمان.</span></li>
+        <li><span class="bullet">✓</span><span><b>بناء ملف أعمال برمجي</b> <span class="en">Portfolio</span> يظهر مشاريعك لأصحاب العمل.</span></li>
+      </ul>
+
+      <div class="grid g3">
+        <div class="card"><div class="ico green">🔀</div><div><h3>Pull Request</h3><p>اقتراح التعديلات ومراجعتها قبل الدمج.</p></div></div>
+        <div class="card"><div class="ico purple">❗</div><div><h3>Issues</h3><p>تتبّع الأخطاء وخطط المهام مع الفريق.</p></div></div>
+        <div class="card"><div class="ico orange">⚙️</div><div><h3>Actions</h3><p>أتمتة الاختبار والنشر المستمر.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== الشريحة 10: الخلاصة وشكرًا ========== -->
+  <section class="slide" aria-label="الشريحة 10">
+    <div class="inner thanks stagger">
+      <span class="eyebrow">النهاية</span>
+      <div class="big">شكرًا لإصغائكم</div>
+      <p class="sub">الخلاصة في ثلاث نقاط تلخّص رحلتنا اليوم</p>
+
+      <div class="summary">
+        <div><b>Git</b><small>نظام تحكّم في الإصدارات، يعمل محليًا على جهازك.</small></div>
+        <div><b>GitHub</b><small>منصة سحابية لاستضافة المستودعات والتعاون.</small></div>
+        <div><b>Together</b><small>معًا: نسخ محفوظة + عمل جماعي منظم + ملف أعمال قوي.</small></div>
+      </div>
+
+      <div class="hr"></div>
+      <p class="sub">إعداد وتقديم: <b style="color:#fff">[اسم الطالب]</b></p>
+
+      <div class="kbd-hint">
+        <span>للعودة إلى البداية اضغط</span><kbd>Home</kbd>
+        <span>أو</span><kbd>R</kbd>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- أزرار التنقل -->
+<nav class="nav" aria-label="التنقل بين الشرائح">
+  <button id="next" title="الشريحة التالية (←)" aria-label="التالي">→</button>
+  <div class="dots" id="dots"></div>
+  <button id="prev" title="الشريحة السابقة (→)" aria-label="السابق">←</button>
+</nav>
+
+<script>
+/* ============================================================
+   محرك العرض: تبديل الشرائح، أسهم RTL، نقاط، شريط تقدم
+   ============================================================ */
+const slides = [...document.querySelectorAll(".slide")];
+const bar    = document.getElementById("bar");
+const curEl  = document.getElementById("cur");
+const totEl  = document.getElementById("tot");
+const dotsEl = document.getElementById("dots");
+const prevBtn= document.getElementById("prev");
+const nextBtn= document.getElementById("next");
+
+let i = 0;                    // الشريحة الحالية
+const total = slides.length;
+totEl.textContent = String(total).padStart(2, "0");
+
+/* بناء النقاط */
+slides.forEach((_, n) => {
+  const d = document.createElement("i");
+  d.addEventListener("click", () => go(n));
+  dotsEl.appendChild(d);
+});
+const dots = [...dotsEl.children];
+
+/* دمج رسم/تحديث الواجهة */
+function render(back = false) {
+  slides.forEach((s, n) => {
+    s.classList.toggle("active", n === i);
+    s.classList.toggle("leaving-back", back && n !== i);
+  });
+  bar.style.width = ((i + 1) / total * 100) + "%";
+  curEl.textContent = String(i + 1).padStart(2, "0");
+  dots.forEach((d, n) => d.classList.toggle("on", n === i));
+  prevBtn.disabled = i === 0;
+  nextBtn.disabled = i === total - 1;
+  slides[i].scrollTop = 0;            // إعادة التمرير لأعلى
+}
+
+function go(n) {
+  const back = n < i;
+  i = Math.max(0, Math.min(total - 1, n));
+  render(back);
+}
+const next = () => go(i + 1);
+const prev = () => go(i - 1);
+
+/* لوحة المفاتيح — في RTL السهم الأيسر يتقدّم للأمام */
+document.addEventListener("keydown", (e) => {
+  if (["ArrowLeft", "PageDown", " "].includes(e.key)) { e.preventDefault(); next(); }
+  else if (["ArrowRight", "PageUp"].includes(e.key))  { e.preventDefault(); prev(); }
+  else if (e.key === "Home") { e.preventDefault(); go(0); }
+  else if (e.key === "End")  { e.preventDefault(); go(total - 1); }
+  else if (e.key.toLowerCase() === "r") { go(0); }
+});
+
+prevBtn.addEventListener("click", prev);
+nextBtn.addEventListener("click", next);
+
+/* سحب باللمس (الهاتف) */
+let x0 = null;
+document.addEventListener("touchstart", e => x0 = e.changedTouches[0].clientX, {passive:true});
+document.addEventListener("touchend", e => {
+  if (x0 === null) return;
+  const dx = e.changedTouches[0].clientX - x0;
+  if (Math.abs(dx) > 60) (dx < 0 ? prev() : next());  // السحب لليسار = تقدّم في RTL
+  x0 = null;
+}, {passive:true});
+
+/* التمرير بعجلة الفأرة (مع احترام تمرير المحتوى داخل الشريحة) */
+let lock = false;
+document.addEventListener("wheel", e => {
+  if (lock) return;
+  const el = slides[i];
+  const canScroll = el.scrollHeight > el.clientHeight + 4;
+  if (canScroll) {
+    const atTop = el.scrollTop <= 0;
+    const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+    if ((e.deltaY > 0 && !atEnd) || (e.deltaY < 0 && !atTop)) return;
+  }
+  if (Math.abs(e.deltaY) < 25) return;
+  lock = true;
+  (e.deltaY > 0 ? next() : prev)();
+  setTimeout(() => lock = false, 900);
+}, {passive:true});
+
+render();
+</script>
+</body>
+</html>
